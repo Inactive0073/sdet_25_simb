@@ -3,3 +3,6 @@ venv/
 .env
 secrets/
 secret/
+
+# cache
+__pycache__/
