@@ -34,7 +34,7 @@ def driver(request: pytest.FixtureRequest) -> Generator[WebDriver, Any, Any]:
         chrome_service = ChromeService(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
     else:
-        raise ValueError(f"Only chrome is supported in this case")
+        raise ValueError("Only chrome is supported in this case")
 
     driver.implicitly_wait(10)
     yield driver
@@ -58,5 +58,5 @@ def pytest_runtest_makereport(
                     name="failure_screenshot",
                     attachment_type=allure.attachment_type.PNG,
                 )
-            except Exception as e:
+            except Exception:
                 pass
