@@ -49,6 +49,12 @@ python -m pytest -q --headless
 docker compose up -d --build jenkins
 ```
 
+Перед запуском можно создать `.env` из шаблона:
+
+```bash
+copy .env.example .env
+```
+
 После старта:
 
 1. Открыть `http://localhost:8080`.
@@ -58,7 +64,7 @@ docker compose up -d --build jenkins
 ### Что реализовано в pipeline
 
 - `CI1`: pipeline job в Jenkins, сборка и запуск автотестов.
-- `CI2`: публикация Allure в Jenkins + архивирование HTML-отчёта `allure-report.tar.gz` по каждому build.
+- `CI2`: публикация Allure build-action (`/allure/`) + fallback HTML tab `Allure HTML Report` + архивирование `allure-report.tar.gz` по каждому build.
 - `CI3`: `cron('H H * * *')` + email-рассылка через `email-ext` с passed/failed статистикой и вложением `allure-report.tar.gz`.
 - `CI4`: запуск в Docker (`autotests + selenoid + selenoid-ui`), автоподготовка browser image, генерация `allure-results/junit.xml`, pip cache volume.
 - `CI5`: `pollSCM('H/5 * * * *')` для автозапуска по коммитам.
@@ -70,9 +76,12 @@ docker compose up -d --build jenkins
   - `ID`: `github-ssh`
   - доступ к `git@github.com:Inactive0073/sdet_25_simb.git`
 - Allure Commandline в `Manage Jenkins -> Tools` (installation name: `allure`).
+- Установленные плагины Jenkins: `allure-jenkins-plugin`, `matrix-project`, `htmlpublisher`, `email-ext`.
+- Если Jenkins уже запущен с существующим `jenkins_home`, после изменения `plugins.txt` плагины нужно поставить через UI (`Manage Jenkins -> Plugins`) или пересоздать volume `jenkins_home` и заново поднять Jenkins.
 - SMTP в Jenkins global config (для `email-ext`).
 - Переменная окружения Jenkins controller:
-  - `CI_EMAIL_TO=self@example.com,mentor@example.com`
+  - `CI_EMAIL_TO=self@example.com, mentor@example.com` (поддерживаются разделители `,`, `;`, пробелы)
+  - `CI_EMAIL_FROM=smtp_login@example.com` (используется как `From/Reply-To`)
 
 ### Переменные seed-job (из `docker-compose.yml`)
 
@@ -99,6 +108,12 @@ docker compose --profile ci up --build --abort-on-container-exit --exit-code-fro
 
 - `allure-results/`
 - `allure-results/junit.xml`
+
+## Где смотреть отчёты в Jenkins
+
+- Основной Allure action: `.../job/<job>/<build>/allure/`.
+- Fallback отчёт: вкладка/ссылка `Allure HTML Report` в build (публикуется через `publishHTML`, `keepAll: true`).
+- Переносимый артефакт: `allure-report.tar.gz`.
 
 ## Примечание по кешу
 

@@ -2,6 +2,12 @@
 
 ## 1. Старт Jenkins
 
+Создать локальный `.env` из шаблона:
+
+```bash
+copy .env.example .env
+```
+
 ```bash
 docker compose up -d --build jenkins
 ```
@@ -25,10 +31,17 @@ Seed-job создаётся автоматически и поднимает pip
 Настроить SMTP в Jenkins (`Manage Jenkins -> Configure System`) для плагина `email-ext`.
 
 Для публикации Allure отчёта добавить Allure Commandline в `Manage Jenkins -> Tools` (installation name: `allure`).
+Проверить плагины: `allure-jenkins-plugin`, `matrix-project`, `htmlpublisher`, `email-ext`.
+
+Если Jenkins уже запущен с существующим `jenkins_home`, изменения `docker/jenkins/plugins.txt` не доустанавливаются автоматически в уже существующий volume. В этом случае:
+
+- установить недостающие плагины через UI (`Manage Jenkins -> Plugins`), затем `Restart Jenkins`;
+- либо пересоздать volume `jenkins_home` и поднять Jenkins заново.
 
 Получатели уведомлений задаются через переменную окружения контроллера:
 
-- `CI_EMAIL_TO=self@example.com,mentor@example.com`
+- `CI_EMAIL_TO=self@example.com, mentor@example.com` (поддерживаются разделители `,`, `;`, пробелы)
+- `CI_EMAIL_FROM=smtp_login@example.com` (`From/Reply-To` в `email-ext`)
 
 ## 3. Что запускает pipeline
 
@@ -37,6 +50,7 @@ Seed-job создаётся автоматически и поднимает pip
 - Автоподготовка browser image `selenoid/vnc_chrome:123.0` (pull при отсутствии).
 - Копирование `allure-results` из контейнера автотестов в workspace Jenkins.
 - Публикация Allure в Jenkins UI.
+- Fallback публикация HTML отчёта через `publishHTML` (вкладка `Allure HTML Report`, `keepAll: true`).
 - Архивация HTML-отчёта `allure-report.tar.gz` (и `allure-results/junit.xml` для test trend/статистики).
 - Публикация JUnit (`allure-results/junit.xml`) и email-рассылка с passed/failed статистикой.
 
@@ -52,3 +66,9 @@ Seed-job создаётся автоматически и поднимает pip
 - `CI3`: работает cron + email с вложением `allure-report.tar.gz`.
 - `CI4`: тесты идут в Docker через Selenoid, есть `allure-results/junit.xml`, используется `pip_cache` volume.
 - `CI5`: новые коммиты детектируются через polling и запускают build.
+
+## 6. Где смотреть отчёт
+
+- Build-action Allure: `.../job/<job>/<build>/allure/`.
+- HTML fallback: ссылка/вкладка `Allure HTML Report` в конкретной сборке.
+- Артефакт: `allure-report.tar.gz`.

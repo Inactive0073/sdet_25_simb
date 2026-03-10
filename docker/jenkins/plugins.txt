@@ -1,6 +1,8 @@
 workflow-aggregator
 git
 docker-workflow
+matrix-project
+htmlpublisher
 credentials-binding
 timestamper
 allure-jenkins-plugin

@@ -113,7 +113,19 @@ pipeline {
 
                 if (allureFileCount > 0) {
                     echo "Publishing Allure report from ${env.ALLURE_RESULTS_DIR}"
-                    allure commandline: 'allure', includeProperties: false, jdk: '', reportBuildPolicy: 'ALWAYS', results: [[path: "${env.ALLURE_RESULTS_DIR}"]]
+                    try {
+                        step([
+                            $class: 'AllureReportPublisher',
+                            includeProperties: false,
+                            jdk: '',
+                            reportBuildPolicy: 'ALWAYS',
+                            results: [[path: "${env.ALLURE_RESULTS_DIR}"]]
+                        ])
+                        echo 'Allure action published'
+                    } catch (Exception e) {
+                        echo "Allure action publish failed: ${e.getMessage()}"
+                        unstable('Allure build action publish failed. HTML fallback will still be published.')
+                    }
 
                     String archiveSource = env.ALLURE_RESULTS_DIR
                     try {
@@ -123,8 +135,18 @@ pipeline {
                             "${allureHome}/bin/allure" generate "${env.ALLURE_RESULTS_DIR}" -o allure-report --clean
                         """
                         archiveSource = 'allure-report'
+                        publishHTML(target: [
+                            allowMissing: false,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'allure-report',
+                            reportFiles: 'index.html',
+                            reportName: 'Allure HTML Report',
+                            reportTitles: 'Allure HTML Report'
+                        ])
+                        echo 'HTML report published'
                     } catch (Exception e) {
-                        echo "Allure CLI tool 'allure' is not configured. Fallback to raw allure-results archive."
+                        echo "Allure HTML publish fallback triggered: ${e.getMessage()}"
                     }
 
                     sh "tar -czf allure-report.tar.gz ${archiveSource} || true"
@@ -134,12 +156,24 @@ pipeline {
                 }
             }
 
-            archiveArtifacts artifacts: 'allure-report.tar.gz,test-summary.env,allure-results/junit.xml', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'allure-report.tar.gz,test-summary.env,allure-results/**/*', allowEmptyArchive: true
 
             script {
-                if (!env.CI_EMAIL_TO?.trim()) {
+                List<String> recipients = (env.CI_EMAIL_TO ?: '')
+                    .split(/[\\s,;]+/)
+                    .collect { it.trim() }
+                    .findAll { it }
+
+                if (recipients.isEmpty()) {
                     echo 'CI_EMAIL_TO is empty. Skip email notification.'
                     return
+                }
+                String normalizedRecipients = recipients.join(',')
+                echo "Email recipients normalized: ${normalizedRecipients}"
+
+                String fromAddress = (env.CI_EMAIL_FROM ?: '').trim()
+                if (!fromAddress) {
+                    echo 'CI_EMAIL_FROM is empty. Jenkins SMTP default sender will be used.'
                 }
 
                 String passed = '0'
@@ -168,8 +202,8 @@ pipeline {
                         }
                 }
 
-                emailext(
-                    to: env.CI_EMAIL_TO,
+                Map emailArgs = [
+                    to: normalizedRecipients,
                     subject: "[${env.JOB_NAME}] #${env.BUILD_NUMBER} ${currentBuild.currentResult}",
                     mimeType: 'text/html',
                     body: """
@@ -182,7 +216,19 @@ pipeline {
                         <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                     """.stripIndent(),
                     attachmentsPattern: 'allure-report.tar.gz'
-                )
+                ]
+
+                if (fromAddress) {
+                    emailArgs.from = fromAddress
+                    emailArgs.replyTo = fromAddress
+                }
+
+                try {
+                    emailext(emailArgs)
+                } catch (Exception e) {
+                    echo "Email send failed: ${e.getMessage()}"
+                    unstable('Email delivery failed. Check SMTP settings/deliverability.')
+                }
             }
         }
     }
