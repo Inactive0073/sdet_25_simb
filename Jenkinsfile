@@ -101,7 +101,6 @@ pipeline {
                 fi
 
                 printf "PASSED=%s\\nFAILED=%s\\nERRORS=%s\\nSKIPPED=%s\\nTOTAL=%s\\n" "${passed}" "${failed}" "${errors}" "${skipped}" "${tests}" > test-summary.env
-                tar -czf allure-report.tar.gz "${ALLURE_RESULTS_DIR}" || true
             '''
 
             junit allowEmptyResults: true, testResults: 'allure-results/junit.xml'
@@ -114,12 +113,27 @@ pipeline {
 
                 if (allureFileCount > 0) {
                     allure includeProperties: false, jdk: '', reportBuildPolicy: 'ALWAYS', results: [[path: "${env.ALLURE_RESULTS_DIR}"]]
+
+                    String archiveSource = env.ALLURE_RESULTS_DIR
+                    try {
+                        String allureHome = tool 'allure'
+                        sh """
+                            rm -rf allure-report
+                            "${allureHome}/bin/allure" generate "${env.ALLURE_RESULTS_DIR}" -o allure-report --clean
+                        """
+                        archiveSource = 'allure-report'
+                    } catch (Exception e) {
+                        echo "Allure CLI tool 'allure' is not configured. Fallback to raw allure-results archive."
+                    }
+
+                    sh "tar -czf allure-report.tar.gz ${archiveSource} || true"
                 } else {
                     echo "Allure results are empty. Skipping Allure publish."
+                    sh "tar -czf allure-report.tar.gz ${env.ALLURE_RESULTS_DIR} || true"
                 }
             }
 
-            archiveArtifacts artifacts: 'allure-results/**/*,allure-report.tar.gz,test-summary.env', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'allure-report.tar.gz,test-summary.env,allure-results/junit.xml', allowEmptyArchive: true
 
             script {
                 if (!env.CI_EMAIL_TO?.trim()) {

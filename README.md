@@ -58,7 +58,7 @@ docker compose up -d --build jenkins
 ### Что реализовано в pipeline
 
 - `CI1`: pipeline job в Jenkins, сборка и запуск автотестов.
-- `CI2`: публикация Allure в Jenkins + архивирование `allure-results` отдельно по каждому build.
+- `CI2`: публикация Allure в Jenkins + архивирование HTML-отчёта `allure-report.tar.gz` по каждому build.
 - `CI3`: `cron('H H * * *')` + email-рассылка через `email-ext` с passed/failed статистикой и вложением `allure-report.tar.gz`.
 - `CI4`: запуск в Docker (`autotests + selenoid + selenoid-ui`), автоподготовка browser image, генерация `allure-results/junit.xml`, pip cache volume.
 - `CI5`: `pollSCM('H/5 * * * *')` для автозапуска по коммитам.

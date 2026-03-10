@@ -37,7 +37,7 @@ Seed-job создаётся автоматически и поднимает pip
 - Автоподготовка browser image `selenoid/vnc_chrome:123.0` (pull при отсутствии).
 - Копирование `allure-results` из контейнера автотестов в workspace Jenkins.
 - Публикация Allure в Jenkins UI.
-- Архивация `allure-results/**/*` и `allure-report.tar.gz`.
+- Архивация HTML-отчёта `allure-report.tar.gz` (и `allure-results/junit.xml` для test trend/статистики).
 - Публикация JUnit (`allure-results/junit.xml`) и email-рассылка с passed/failed статистикой.
 
 ## 4. Триггеры
