@@ -112,7 +112,8 @@ pipeline {
                 ).trim() as Integer
 
                 if (allureFileCount > 0) {
-                    allure includeProperties: false, jdk: '', reportBuildPolicy: 'ALWAYS', results: [[path: "${env.ALLURE_RESULTS_DIR}"]]
+                    echo "Publishing Allure report from ${env.ALLURE_RESULTS_DIR}"
+                    allure commandline: 'allure', includeProperties: false, jdk: '', reportBuildPolicy: 'ALWAYS', results: [[path: "${env.ALLURE_RESULTS_DIR}"]]
 
                     String archiveSource = env.ALLURE_RESULTS_DIR
                     try {
