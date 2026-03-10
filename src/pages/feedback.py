@@ -11,7 +11,7 @@ from typing_extensions import Self
 import random
 
 from .base import BasePage
-from locators import FeedbackLocators
+from src.locators import FeedbackLocators
 
 
 class FeedbackPage(BasePage):

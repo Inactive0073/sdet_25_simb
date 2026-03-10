@@ -1,0 +1,88 @@
+services:
+  jenkins:
+    container_name: sdet_jenkins
+    build:
+      context: .
+      dockerfile: docker/jenkins/Dockerfile
+    image: sdet/jenkins-local:latest
+    user: "0:0"
+    ports:
+      - "8080:8080"
+    environment:
+      JENKINS_ADMIN_ID: admin
+      JENKINS_ADMIN_PASSWORD: admin
+      JENKINS_SEED_JOB_NAME: bankingproject-ui-tests
+      JENKINS_GIT_URL: git@github.com:Inactive0073/sdet_25_simb.git
+      JENKINS_GIT_BRANCH: "*/main"
+      JENKINS_GIT_CREDENTIALS_ID: github-ssh
+      JENKINS_PIPELINE_PATH: Jenkinsfile
+      CI_EMAIL_TO: "${CI_EMAIL_TO:-}"
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./:/workspace
+      - //var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  selenoid:
+    container_name: sdet_selenoid
+    build:
+      context: .
+      dockerfile: docker/selenoid/Dockerfile
+    image: sdet/selenoid-local:latest
+    profiles: ["ci"]
+    command:
+      - "-conf"
+      - "/etc/selenoid/browsers.json"
+      - "-container-network"
+      - "sdet_ci"
+      - "-limit"
+      - "4"
+      - "-session-attempt-timeout"
+      - "2m"
+      - "-timeout"
+      - "5m"
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "4444:4444"
+    networks:
+      - ci
+
+  selenoid-ui:
+    container_name: sdet_selenoid_ui
+    image: aerokube/selenoid-ui:latest
+    profiles: ["ci"]
+    command:
+      - "--selenoid-uri"
+      - "http://selenoid:4444"
+    depends_on:
+      - selenoid
+    ports:
+      - "8081:8080"
+    networks:
+      - ci
+
+  autotests:
+    container_name: sdet_autotests
+    profiles: ["ci"]
+    build:
+      context: .
+      dockerfile: docker/autotests/Dockerfile
+    environment:
+      CI: "true"
+      SELENIUM_REMOTE_URL: http://selenoid:4444/wd/hub
+    depends_on:
+      - selenoid
+    networks:
+      - ci
+    volumes:
+      - pip_cache:/root/.cache/pip
+
+networks:
+  ci:
+    name: sdet_ci
+
+volumes:
+  jenkins_home:
+  pip_cache:

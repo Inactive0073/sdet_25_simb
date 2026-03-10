@@ -1,0 +1,8 @@
+workflow-aggregator
+git
+docker-workflow
+credentials-binding
+timestamper
+allure-jenkins-plugin
+email-ext
+mailer

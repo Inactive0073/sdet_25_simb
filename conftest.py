@@ -1,3 +1,4 @@
+import os
 import pytest
 import allure
 from typing import Any, Generator
@@ -23,18 +24,24 @@ def pytest_addoption(parser):
 def driver(request: pytest.FixtureRequest) -> Generator[WebDriver, Any, Any]:
     browser = request.config.getoption("--browser")
     headless = request.config.getoption("--headless")
+    remote_url = os.getenv("SELENIUM_REMOTE_URL", "").strip()
 
-    if browser == "chrome":
-        chrome_options = ChromeOptions()
-        if headless:
-            chrome_options.add_argument("--headless=new")
-            chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--no-sandbox")
+    if browser != "chrome":
+        raise ValueError("Only chrome is supported in this case")
+
+    chrome_options = ChromeOptions()
+    if headless:
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+    if remote_url:
+        driver = webdriver.Remote(command_executor=remote_url, options=chrome_options)
+    else:
         chrome_service = ChromeService(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    else:
-        raise ValueError("Only chrome is supported in this case")
 
     driver.implicitly_wait(10)
     yield driver

@@ -3,7 +3,7 @@ import allure
 import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from pages.feedback import FeedbackPage
+from src.pages.feedback import FeedbackPage
 
 
 @allure.epic("UI Tests")

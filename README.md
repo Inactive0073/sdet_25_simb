@@ -1,110 +1,105 @@
-# Feedback Form Automation Tests
+# Feedback Form UI Tests + CI (Jenkins + Docker + Selenoid)
 
-Автоматизация тестирования формы обратной связи на сайте [https://practice-automation.com/form-fields/](https://practice-automation.com/form-fields/).
+Автотесты формы обратной связи: <https://practice-automation.com/form-fields/>.
 
-## Навигация по README
+## Структура проекта
 
-- [Установка и запуск](#installation)
-- [Тестовые сценарии](#test-scenarios)
-- [Структура Page Object](#page-object)
+- `src/pages` - Page Object слои (`BasePage`, `FeedbackPage`).
+- `src/locators` - локаторы страницы формы.
+- `tests` - UI тесты (`smoke`, `regression`).
+- `docker/autotests` - контейнер запуска pytest.
+- `docker/selenoid` - конфигурация Selenoid.
+- `docker/jenkins` - кастомный Jenkins с preinstalled plugins и seed-job.
+- `Jenkinsfile` - единый CI pipeline (CI1..CI5).
 
----
-
-## Содержание проекта
-
-- [`pages/`](#pages) – страницы с Page Object моделями.
-- [`locators/`](#locators) – локаторы вынесены в отдельный модуль для удобства поддержки.
-- [`tests/`](#tests) – тесты, покрывающие различные сценарии формы.
-- [`base.py`](#base) – базовый класс страницы с общими методами для работы с Selenium.
-
----
-
-
-## Структура Page Object {$page-object}
-
-- **FeedbackPage**: класс для взаимодействия с формой обратной связи.
-  - Методы:
-    - `enter_name(username: str)` – ввод имени.
-    - `enter_password(password: str)` – ввод пароля.
-    - `enter_email(email: str)` – ввод email.
-    - `select_favorit_drink(target: list[str])` – выбор чекбоксов напитков.
-    - `select_favorite_color(target_color: str)` – выбор радио-кнопки цвета.
-    - `select_automation_select()` – случайный выбор из селекта Automation Tools.
-    - `enter_message()` – ввод автоматически сгенерированного сообщения.
-    - `submit()` – сабмит формы с безопасным перехватом alert.
-- Все локаторы вынесены в `locators/FeedbackLocators.py` для централизованного управления селекторами.
-
----
-
-## Используемые технологии
-
-- Python 3.10
-- Selenium WebDriver
-- Pytest
-- Ruff
-- Page Object Pattern + Fluent
-- WebDriverWait и Expected Conditions для стабильного взаимодействия с элементами
-- Логика безопасного перехвата alert через `WebDriverWait` с обработкой `TimeoutException`.
-
----
-
-## Установка и запуск {#installation}
-
-1. Установить зависимости:
+## Локальный запуск
 
 ```bash
 python -m venv .venv
-source .venv/scripts/activate
+.venv\Scripts\activate
 pip install -r requirements.txt
+python -m pytest -q
 ```
-2. Запуск тестов
+
+Запуск только сбора тестов:
+
 ```bash
-pytest -v --tb=short
+python -m pytest --collect-only -q
 ```
-3. Для генерации Allure отчёта
+
+## Remote browser (Selenoid)
+
+`conftest.py` поддерживает два режима:
+
+- локальный `webdriver.Chrome` (по умолчанию);
+- удалённый `webdriver.Remote`, если задан `SELENIUM_REMOTE_URL`.
+
+Пример:
+
 ```bash
-pytest --alluredir=allure-results
-allure serve allure-results
+set SELENIUM_REMOTE_URL=http://localhost:4444/wd/hub
+python -m pytest -q --headless
 ```
 
-## Тестовые сценарии {#test-scenarios}
+## Jenkins + Docker (CI1..CI5)
 
-Ниже приведены примеры **позитивного** и **негативного** тест-кейсов для формы обратной связи.
+### Быстрый старт
 
-### 1. Позитивный тест
+```bash
+docker compose up -d --build jenkins
+```
 
-**Цель:** проверить, что форма успешно отправляется при корректных данных.
+После старта:
 
-**Шаги:**
+1. Открыть `http://localhost:8080`.
+2. Войти `admin/admin`.
+3. Убедиться, что создан job `bankingproject-ui-tests`.
 
-1. Открыть страницу формы.
-2. Ввести валидное имя.
-3. Ввести валидный пароль.
-4. Ввести корректный email.
-5. Выбрать любимый напиток (например, кофе или молоко).
-6. Выбрать любимый цвет (например, жёлтый).
-7. Выбрать случайный инструмент автоматизации.
-8. Сформировать сообщение на основе списка инструментов.
-9. Отправить форму.
-10. Проверить, что появился alert с текстом `"Message received!"`.
-11. Сделать скриншот страницы и alert для Allure отчёта.
+### Что реализовано в pipeline
 
-### 2. Негативный тест
+- `CI1`: pipeline job в Jenkins, сборка и запуск автотестов.
+- `CI2`: публикация Allure в Jenkins + архивирование `allure-results` отдельно по каждому build.
+- `CI3`: `cron('H H * * *')` + email-рассылка через `email-ext` с passed/failed статистикой и вложением `allure-report.tar.gz`.
+- `CI4`: запуск в Docker (`autotests + selenoid + selenoid-ui`), автоподготовка browser image, генерация `allure-results/junit.xml`, pip cache volume.
+- `CI5`: `pollSCM('H/5 * * * *')` для автозапуска по коммитам.
 
-**Цель:** убедиться, что форма корректно реагирует на невалидный email.
+### Обязательная конфигурация Jenkins
 
-**Шаги:**
+- Credential для Git:
+  - `Kind`: SSH Username with private key
+  - `ID`: `github-ssh`
+  - доступ к `git@github.com:Inactive0073/sdet_25_simb.git`
+- Allure Commandline в `Manage Jenkins -> Tools` (installation name: `allure`).
+- SMTP в Jenkins global config (для `email-ext`).
+- Переменная окружения Jenkins controller:
+  - `CI_EMAIL_TO=self@example.com,mentor@example.com`
 
-1. Открыть страницу формы.
-2. Ввести валидное имя.
-3. Ввести валидный пароль.
-4. Ввести невалидный email.
-5. Выбрать любимый напиток.
-6. Выбрать любимый цвет.
-7. Выбрать инструмент автоматизации.
-8. Сформировать сообщение.
-9. Отправить форму.
-10. Проверить поведение сайта:
-    - если alert появляется, проверить его текст;
-    - если alert не появляется, тест должен корректно зафиксировать отсутствие сообщения.
-11. Сделать скриншот формы для Allure отчёта.
+### Переменные seed-job (из `docker-compose.yml`)
+
+- `JENKINS_GIT_URL=git@github.com:Inactive0073/sdet_25_simb.git`
+- `JENKINS_GIT_BRANCH=*/main`
+- `JENKINS_GIT_CREDENTIALS_ID=github-ssh`
+- `JENKINS_PIPELINE_PATH=Jenkinsfile`
+
+## Команды для проверки
+
+Статическая проверка compose:
+
+```bash
+docker compose --profile ci config
+```
+
+Контейнерный прогон:
+
+```bash
+docker compose --profile ci up --build --abort-on-container-exit --exit-code-from autotests autotests selenoid selenoid-ui
+```
+
+Проверить, что после прогона есть:
+
+- `allure-results/`
+- `allure-results/junit.xml`
+
+## Примечание по кешу
+
+В задании упомянут кеш Maven. В данном Python-проекте используется persistent `pip` cache (`pip_cache` volume), что даёт фактическое ускорение повторных сборок контейнера автотестов.
